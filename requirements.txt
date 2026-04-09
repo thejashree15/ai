@@ -2,3 +2,5 @@ streamlit
 PyPDF2
 scikit-learn
 numpy
+requests
+gTTS

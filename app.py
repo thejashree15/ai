@@ -4,10 +4,14 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import re
 import time
+import requests
+
+# 🔑 ADD YOUR API KEY HERE
+API_KEY = "AIzaSyDsXwoXa2vm3ZzNwIs__3WAtTZfts2SoUs"
 
 st.set_page_config(page_title="AI Study Assistant", page_icon="🤖", layout="wide")
 
-# 🔥 CUSTOM CSS (PREMIUM LOOK)
+# 🔥 CUSTOM CSS
 st.markdown("""
 <style>
 body {
@@ -31,14 +35,21 @@ with st.sidebar:
         st.experimental_rerun()
 
     st.markdown("---")
+
+    # 🎯 QUIZ BUTTON IN SIDEBAR
+    st.markdown("### 📝 Quiz Generator")
+    generate_btn = st.button("Generate Quiz")
+
+    st.markdown("---")
     st.markdown("### 🚀 About")
     st.write("💡 AI Study Assistant")
     st.write("📚 Ask questions from PDFs")
+    st.write("🎥 Learn with videos")
     st.write("⚡ Built with Streamlit")
 
 # 🔥 TITLE
 st.markdown("<h1>🤖 AI Study Assistant</h1>", unsafe_allow_html=True)
-st.caption("✨ Premium AI PDF Chat Experience")
+st.caption("✨ AI PDF Chat + Quiz + Video Learning")
 
 # 🔥 SESSION STATE
 if "messages" not in st.session_state:
@@ -47,7 +58,7 @@ if "messages" not in st.session_state:
 if "pdf_text" not in st.session_state:
     st.session_state.pdf_text = ""
 
-# 🔥 LOAD MULTIPLE PDFs
+# 🔥 LOAD PDFs
 if pdfs:
     text = ""
 
@@ -74,7 +85,6 @@ question = st.chat_input("💬 Ask anything from your PDFs...")
 
 if question:
 
-    # Show user message
     st.session_state.messages.append({"role": "user", "content": f"🧑 {question}"})
     with st.chat_message("user"):
         st.markdown(f"🧑 {question}")
@@ -94,7 +104,6 @@ if question:
             vectors = vectorizer.fit_transform(clean_sentences + [question])
 
             similarity = cosine_similarity(vectors[-1], vectors[:-1])[0]
-
             top_indices = similarity.argsort()[-5:][::-1]
 
             selected = [
@@ -111,10 +120,8 @@ if question:
         except:
             answer = "⚠️ Error processing your request."
 
-    # 🔥 SAVE ANSWER
     st.session_state.messages.append({"role": "assistant", "content": f"🤖 {answer}"})
 
-    # 🔥 TYPING ANIMATION
     with st.chat_message("assistant"):
         placeholder = st.empty()
         typed_text = ""
@@ -123,3 +130,64 @@ if question:
             typed_text += word + " "
             placeholder.markdown(f"🤖 {typed_text}")
             time.sleep(0.03)
+
+# ================= QUIZ FUNCTION ================= #
+
+def generate_quiz(text):
+    sentences = text.split(".")[:5]
+
+    quiz = []
+    for s in sentences:
+        if len(s.strip()) > 20:
+            quiz.append(f"What is: {s.strip()} ?")
+
+    return quiz
+
+# ================= SHOW QUIZ ================= #
+
+if generate_btn:
+    if st.session_state.pdf_text == "":
+        st.warning("⚠️ Upload PDF first")
+    else:
+        st.subheader("📝 Generated Quiz")
+
+        quiz = generate_quiz(st.session_state.pdf_text)
+
+        for i, q in enumerate(quiz):
+            st.write(f"Q{i+1}: {q}")
+
+# ================= YOUTUBE FUNCTION ================= #
+
+def search_youtube(query):
+    url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&key={API_KEY}&maxResults=3&type=video"
+
+    response = requests.get(url)
+    data = response.json()
+
+    videos = []
+
+    for item in data.get("items", []):
+        video_id = item["id"]["videoId"]
+        title = item["snippet"]["title"]
+
+        videos.append({
+            "title": title,
+            "url": f"https://www.youtube.com/watch?v={video_id}"
+        })
+
+    return videos
+
+# ================= YOUTUBE UI ================= #
+
+st.markdown("---")
+st.subheader("🎥 Learn from Videos")
+
+topic = st.text_input("Enter topic to learn")
+
+if st.button("Search Videos"):
+    if topic:
+        videos = search_youtube(topic)
+
+        for vid in videos:
+            st.write(f"▶ {vid['title']}")
+            st.video(vid['url'])
