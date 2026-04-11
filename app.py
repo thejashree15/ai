@@ -2,192 +2,154 @@ import streamlit as st
 from PyPDF2 import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from gtts import gTTS
+import requests
 import re
 import time
-import requests
+import os
 
-# 🔑 ADD YOUR API KEY HERE
 API_KEY = "AIzaSyDsXwoXa2vm3ZzNwIs__3WAtTZfts2SoUs"
 
 st.set_page_config(page_title="AI Study Assistant", page_icon="🤖", layout="wide")
 
-# 🔥 CUSTOM CSS
+# ================= STYLE =================
 st.markdown("""
 <style>
-body {
-    background-color: #0E1117;
-}
-h1, h2, h3 {
-    color: #00ADB5;
-}
+body {background-color: #0E1117;}
+h1,h2,h3 {color:#00ADB5;}
 </style>
 """, unsafe_allow_html=True)
 
-# 🔥 SIDEBAR
+# ================= SIDEBAR =================
 with st.sidebar:
-    st.markdown("## 📂 Control Panel")
-    st.markdown("---")
+    st.title("📂 Control Panel")
+    pdfs = st.file_uploader("Upload PDFs", type="pdf", accept_multiple_files=True)
 
-    pdfs = st.file_uploader("📄 Upload PDFs", type="pdf", accept_multiple_files=True)
-
-    if st.button("🧹 Clear Chat"):
+    if st.button("Clear Chat"):
         st.session_state.messages = []
-        st.experimental_rerun()
 
-    st.markdown("---")
-
-    # 🎯 QUIZ BUTTON IN SIDEBAR
-    st.markdown("### 📝 Quiz Generator")
-    generate_btn = st.button("Generate Quiz")
-
-    st.markdown("---")
-    st.markdown("### 🚀 About")
-    st.write("💡 AI Study Assistant")
-    st.write("📚 Ask questions from PDFs")
-    st.write("🎥 Learn with videos")
-    st.write("⚡ Built with Streamlit")
-
-# 🔥 TITLE
-st.markdown("<h1>🤖 AI Study Assistant</h1>", unsafe_allow_html=True)
-st.caption("✨ AI PDF Chat + Quiz + Video Learning")
-
-# 🔥 SESSION STATE
+# ================= SESSION =================
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "pdf_text" not in st.session_state:
     st.session_state.pdf_text = ""
+if "score" not in st.session_state:
+    st.session_state.score = 0
+if "total" not in st.session_state:
+    st.session_state.total = 0
 
-# 🔥 LOAD PDFs
+# ================= PDF LOAD =================
 if pdfs:
     text = ""
-
     for pdf in pdfs:
         reader = PdfReader(pdf)
-
         for page in reader.pages:
             if page.extract_text():
                 text += page.extract_text()
 
-    text = re.sub(r'\s+', ' ', text)
-    text = re.sub(r'Page \d+', '', text)
+    st.session_state.pdf_text = re.sub(r'\s+', ' ', text)
 
-    st.session_state.pdf_text = text
-    st.success(f"✅ {len(pdfs)} PDF(s) uploaded successfully!")
+# ================= CHAT =================
+st.title("🤖 AI Study Assistant")
 
-# 🔥 DISPLAY CHAT
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# 🔥 USER INPUT
-question = st.chat_input("💬 Ask anything from your PDFs...")
+def speak(text):
+    tts = gTTS(text)
+    tts.save("out.mp3")
+    return "out.mp3"
+
+question = st.chat_input("Ask from PDF")
 
 if question:
+    st.session_state.messages.append({"role":"user","content":question})
 
-    st.session_state.messages.append({"role": "user", "content": f"🧑 {question}"})
-    with st.chat_message("user"):
-        st.markdown(f"🧑 {question}")
+    sentences = re.split(r'(?<=[.!?]) +', st.session_state.pdf_text)
 
-    if st.session_state.pdf_text == "":
-        answer = "⚠️ Please upload at least one PDF."
-    else:
-        try:
-            sentences = re.split(r'(?<=[.!?]) +', st.session_state.pdf_text)
+    vect = TfidfVectorizer(stop_words='english')
+    X = vect.fit_transform(sentences + [question])
 
-            clean_sentences = [
-                s.strip() for s in sentences
-                if len(s) > 40 and not any(x in s.lower() for x in ["page", "figure"])
-            ]
+    sim = cosine_similarity(X[-1], X[:-1])[0]
+    ans = sentences[sim.argmax()] if len(sentences)>0 else "Upload PDF"
 
-            vectorizer = TfidfVectorizer(stop_words='english')
-            vectors = vectorizer.fit_transform(clean_sentences + [question])
-
-            similarity = cosine_similarity(vectors[-1], vectors[:-1])[0]
-            top_indices = similarity.argsort()[-5:][::-1]
-
-            selected = [
-                clean_sentences[i]
-                for i in top_indices if similarity[i] > 0.2
-            ]
-
-            if selected:
-                answer = " ".join(selected[:3])
-                answer = " ".join(dict.fromkeys(answer.split()))
-            else:
-                answer = "❌ No relevant answer found."
-
-        except:
-            answer = "⚠️ Error processing your request."
-
-    st.session_state.messages.append({"role": "assistant", "content": f"🤖 {answer}"})
+    st.session_state.messages.append({"role":"assistant","content":ans})
 
     with st.chat_message("assistant"):
-        placeholder = st.empty()
-        typed_text = ""
+        st.write(ans)
+        if st.button("🔊 Speak"):
+            st.audio(speak(ans))
 
-        for word in answer.split():
-            typed_text += word + " "
-            placeholder.markdown(f"🤖 {typed_text}")
-            time.sleep(0.03)
+# ================= QUIZ =================
+st.markdown("---")
+st.subheader("📝 Quiz")
 
-# ================= QUIZ FUNCTION ================= #
+difficulty = st.selectbox("Difficulty",["Easy","Medium","Hard"])
+quiz_type = st.selectbox("Type",["MCQ","True/False","Fill"])
 
 def generate_quiz(text):
-    sentences = text.split(".")[:5]
+    s = text.split(".")
+    num = 3 if difficulty=="Easy" else 5 if difficulty=="Medium" else 8
+    return s[:num]
 
-    quiz = []
-    for s in sentences:
-        if len(s.strip()) > 20:
-            quiz.append(f"What is: {s.strip()} ?")
+if st.button("Generate Quiz"):
+    st.session_state.score = 0
+    st.session_state.total = 0
 
-    return quiz
+    qs = generate_quiz(st.session_state.pdf_text)
 
-# ================= SHOW QUIZ ================= #
+    for i,q in enumerate(qs):
+        if len(q.strip())<20:
+            continue
 
-if generate_btn:
-    if st.session_state.pdf_text == "":
-        st.warning("⚠️ Upload PDF first")
-    else:
-        st.subheader("📝 Generated Quiz")
+        st.write(f"Q{i+1}: {q}")
 
-        quiz = generate_quiz(st.session_state.pdf_text)
+        if quiz_type=="MCQ":
+            st.radio("Answer",["A","B","C","D"],key=i)
+        elif quiz_type=="True/False":
+            st.radio("Answer",["True","False"],key=i)
+        else:
+            st.write("Fill:",q[:40],"_____")
 
-        for i, q in enumerate(quiz):
-            st.write(f"Q{i+1}: {q}")
+        if st.button(f"Submit {i}", key=f"s{i}"):
+            st.session_state.total += 1
 
-# ================= YOUTUBE FUNCTION ================= #
+    st.write(f"Score: {st.session_state.score}/{st.session_state.total}")
 
-def search_youtube(query):
-    url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&key={API_KEY}&maxResults=3&type=video"
+# ================= FLASHCARDS =================
+st.markdown("---")
+st.subheader("📚 Flashcards")
 
-    response = requests.get(url)
-    data = response.json()
+if st.button("Generate Flashcards"):
+    for i,s in enumerate(st.session_state.pdf_text.split(".")[:5]):
+        if len(s.strip())<20:
+            continue
 
-    videos = []
+        st.write(f"Card {i+1}")
+        st.write("Q:",s[:40])
+        st.write("A:",s)
 
-    for item in data.get("items", []):
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"]
+        if st.button(f"🔊 {i}", key=f"a{i}"):
+            st.audio(speak(s))
 
-        videos.append({
-            "title": title,
-            "url": f"https://www.youtube.com/watch?v={video_id}"
-        })
-
-    return videos
-
-# ================= YOUTUBE UI ================= #
-
+# ================= YOUTUBE =================
 st.markdown("---")
 st.subheader("🎥 Learn from Videos")
 
-topic = st.text_input("Enter topic to learn")
+topic = st.text_input("Enter topic")
+
+def search_youtube(query):
+    url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&key={API_KEY}&maxResults=3&type=video"
+    res = requests.get(url).json()
+
+    videos = []
+    for item in res.get("items", []):
+        vid = item["id"]["videoId"]
+        videos.append(f"https://youtube.com/watch?v={vid}")
+    return videos
 
 if st.button("Search Videos"):
-    if topic:
-        videos = search_youtube(topic)
-
-        for vid in videos:
-            st.write(f"▶ {vid['title']}")
-            st.video(vid['url'])
+    vids = search_youtube(topic)
+    for v in vids:
+        st.video(v)
