@@ -86,7 +86,6 @@ with st.sidebar:
         st.rerun()
 
 # ================== SESSION STATE ==================
->>>>>>> e56a1348493cbddb0ae653b5bb3b40a5648b8c86
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
