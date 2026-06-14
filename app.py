@@ -49,8 +49,6 @@ st.title("🤖 AI Study Assistant")
 st.write("Upload PDFs → Ask Questions → Generate Notes, Quiz & Flashcards")
 
 # ================== SESSION STATE ==================
-
-=======
 from PyPDF2 import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -274,7 +272,7 @@ def speak(text):
     tts = gTTS(text)
     tts.save("speech.mp3")
     return "speech.mp3"
->>>>>>> e56a1348493cbddb0ae653b5bb3b40a5648b8c86
+
 
 question = st.chat_input("Ask from your PDFs")
 
@@ -519,7 +517,6 @@ if st.button("Search Videos"):
 
 st.markdown("---")
 st.caption("🚀 Built with Streamlit + OpenRouter + FAISS")
-=======
     st.session_state.messages.append({"role": "user", "content": question})
 
     if not st.session_state.pdf_text:
@@ -614,4 +611,4 @@ if st.button("Search Videos"):
     videos = search_youtube(topic)
     for v in videos:
         st.video(v)
->>>>>>> e56a1348493cbddb0ae653b5bb3b40a5648b8c86
+
