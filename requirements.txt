@@ -1,4 +1,14 @@
 streamlit
+python-dotenv
+PyPDF2
+scikit-learn
+sentence-transformers
+faiss-cpu
+numpy
+gtts
+requests
+openai
+torch
 PyPDF2
 scikit-learn
 numpy
