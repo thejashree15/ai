@@ -1,5 +1,5 @@
 import streamlit as st
-<<<<<<< HEAD
+
 
 # ================== PAGE CONFIG ==================
 st.set_page_config(
@@ -95,7 +95,6 @@ if "messages" not in st.session_state:
 if "pdf_text" not in st.session_state:
     st.session_state.pdf_text = ""
 
-<<<<<<< HEAD
 if "pdf_loaded" not in st.session_state:
     st.session_state.pdf_loaded = False
 
@@ -280,7 +279,7 @@ def speak(text):
 question = st.chat_input("Ask from your PDFs")
 
 if question:
-<<<<<<< HEAD
+
 
     st.session_state.messages.append(
         {
